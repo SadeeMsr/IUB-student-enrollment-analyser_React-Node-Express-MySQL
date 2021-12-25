@@ -1,9 +1,13 @@
 const express = require("express");
-
 const PORT = process.env.PORT || 5000;
-
 const app = express();
 const mysql = require("mysql");
+const readXlsxFile = require("read-excel-file/node");
+const multer = require("multer");
+const path = require("path");
+
+
+
 
 // Create connection
 const db = mysql.createConnection({
@@ -22,11 +26,92 @@ db.connect((err) => {
 });
 
 
+const storage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    cb(null, "./server/uploads/");
+  },
+  filename: (req, file, cb) => {
+    cb(null, file.fieldname + "-" + Date.now() + "-" + file.originalname);
+  },
+});
+
+const upload = multer({ storage: storage });
+
+
+app.post("/uploadfile", upload.single("uploadfile"), (req, res) => {
+  importExcelData2MySQL("./server/uploads/" + req.file.filename);
+  console.log(res);
+});
+
+
+function importExcelData2MySQL(filePath) {
+  readXlsxFile(filePath)
+    .then((rows) => {
+
+      const words = rows[1][0].split(' ');
+
+      const semester = words[3];
+      const year = words[4];
+
+      //Classroom table
+      const r =[]
+      for (let i = 4; i < rows.length; i++) {
+        r.push([rows[i][7],rows[i][8]]);
+      }
+     
+      let query1 = "INSERT INTO classroom (roomId, room_capacity) VALUES ?";
+      db.query(query1, [r], (error, response) => {
+        console.log(error || response);
+      });
+
+
+      //course table
+      const r1 =[]
+      for (let i = 4; i < rows.length; i++) {
+        r1.push([rows[i][1],rows[i][10],rows[i][2],rows[i][4],rows[i][0]]);
+      }
+    
+      let query2 = "INSERT INTO course (courseId, courseName, coffered_with, credit_hour, school_title) VALUES ?";
+      db.query(query2, [r1], (error, response) => {
+        console.log(error || response);
+      });
+
+
+      //course_section
+      const r2 =[]
+      for (let i = 4; i < rows.length; i++) {
+        r2.push([rows[i][1],rows[i][3],semester,year,rows[i][11],rows[i][7],rows[i][5],rows[i][6],rows[i][12],rows[i][13],rows[i][14],rows[i][9]]);
+      }
+      
+      let query3 = "INSERT INTO course_section (courseId, section, semester, year, facultyId, roomId, course_capacity, enrolled, st_time, end_time, day, blocked) VALUES ?";
+      db.query(query3, [r2], (error, response) => {
+        console.log(error || response);
+      });
+
+
+      //faculty
+      const r3 =[]
+      for (let i = 4; i < rows.length; i++) {
+        r3.push([rows[i][11].split('-')[0], rows[i][11].split('-')[1]]);
+      }
+      
+      let query4 = "INSERT INTO `faculty` (`facultyId`, `facultyName`) VALUES ?";
+      db.query(query4, [r3], (error, response) => {
+        console.log(error || response);
+      });
+
+
+
+    })
+    .catch((err) => console.log(err));
+}
+
+
 
 
 app.get("/classroom-requirements-data/:semester/:year", (req, res) => {
-const {semester, year} = req.params;
-let sql = `SELECT
+  const { semester, year } = req.params;
+  let sql = `SELECT
      CASE WHEN enrolled BETWEEN 1 AND 10 then '1-10'
      WHEN enrolled BETWEEN 11 AND 20 then '11-20'
      WHEN enrolled BETWEEN 21 AND 30 then '21-30'
@@ -60,8 +145,9 @@ let sql = `SELECT
 
 
 
+
 app.get("/class-size-distributions/:semester/:year", (req, res) => {
-  const {semester, year} = req.params;
+  const { semester, year } = req.params;
   let sql = `SELECT
        CASE WHEN enrolled BETWEEN 1 AND 10 THEN '1-10'
        WHEN enrolled BETWEEN 11 AND 20 THEN '11-20'
@@ -83,36 +169,10 @@ app.get("/class-size-distributions/:semester/:year", (req, res) => {
        WHERE semester = '${semester}' AND year = '${year}' AND course_section.courseId=course.courseId
        GROUP BY enrollment
        HAVING enrollment IS NOT NULL;`;
-  
-    let query = db.query(sql, (err, results) => {
-      if (err) throw err;
-      res.send(results);
-    });
-  });
 
-
-
-
-app.get("/detailed-enrollment-breakdown/:semester/:year", (req, res) => {
-  //let arr = [];
-  const {semester, year} = req.params;
-  let temp;
-  let m;
-  let tempsql = `SELECT max(enrolled) as Max_enrolled From course_section where semester='${semester}' and year=${year};`;
-  let query1 = db.query(tempsql, (err, results) => {
+  let query = db.query(sql, (err, results) => {
     if (err) throw err;
-    var string=JSON.stringify(results);
-    var temp =  JSON.parse(string);
-    m = parseInt(temp[0].Max_enrolled);
-    let sql="";
-    for(let i=1; i<=m; i++){
-      sql += `SELECT '${i}' as Enrollment, COUNT(CASE WHEN c.school_title='SBE' THEN 'SBE' END) AS SBE, COUNT(CASE WHEN c.school_title='SELS' THEN 'SELS' END) AS SELS, COUNT(CASE WHEN c.school_title='SETS' THEN 'SBE' END) AS SETS, COUNT(CASE WHEN c.school_title='SLASS' THEN 'SLASS' END) AS SLASS, COUNT(CASE WHEN c.school_title='SPPH' THEN 'SPPH' END) AS SPPH, COUNT(cs.courseId) AS Total FROM course_section as cs, course as c WHERE semester = '${semester}' AND year = ${year} AND cs.courseId=c.courseId AND cs.blocked IN ('-1', '0') AND enrolled='${i}' UNION `; 
-    }
-    sql += `SELECT 'Total' as Enrollment, COUNT(CASE WHEN c.school_title='SBE' THEN 'SBE' END) AS SBE, COUNT(CASE WHEN c.school_title='SELS' THEN 'SELS' END) AS SELS, COUNT(CASE WHEN c.school_title='SETS' THEN 'SBE' END) AS SETS, COUNT(CASE WHEN c.school_title='SLASS' THEN 'SLASS' END) AS SLASS, COUNT(CASE WHEN c.school_title='SPPH' THEN 'SPPH' END) AS SPPH, COUNT(cs.courseId) AS Total FROM course_section as cs, course as c WHERE semester = '${semester}' AND year = ${year} AND cs.courseId=c.courseId AND cs.blocked IN ('-1', '0') ;`; 
-    let query = db.query(sql, (err, results) => {
-        if (err) throw err;
-          res.send(results);
-      });
+    res.send(results);
   });
 });
 
@@ -120,9 +180,36 @@ app.get("/detailed-enrollment-breakdown/:semester/:year", (req, res) => {
 
 
 
+app.get("/detailed-enrollment-breakdown/:semester/:year", (req, res) => {
+  //let arr = [];
+  const { semester, year } = req.params;
+  let temp;
+  let m;
+  let tempsql = `SELECT max(enrolled) as Max_enrolled From course_section where semester='${semester}' and year=${year};`;
+  let query1 = db.query(tempsql, (err, results) => {
+    if (err) throw err;
+    var string = JSON.stringify(results);
+    var temp = JSON.parse(string);
+    m = parseInt(temp[0].Max_enrolled);
+    let sql = "";
+    for (let i = 1; i <= m; i++) {
+      sql += `SELECT '${i}' as Enrollment, COUNT(CASE WHEN c.school_title='SBE' THEN 'SBE' END) AS SBE, COUNT(CASE WHEN c.school_title='SELS' THEN 'SELS' END) AS SELS, COUNT(CASE WHEN c.school_title='SETS' THEN 'SBE' END) AS SETS, COUNT(CASE WHEN c.school_title='SLASS' THEN 'SLASS' END) AS SLASS, COUNT(CASE WHEN c.school_title='SPPH' THEN 'SPPH' END) AS SPPH, COUNT(cs.courseId) AS Total FROM course_section as cs, course as c WHERE semester = '${semester}' AND year = ${year} AND cs.courseId=c.courseId AND cs.blocked IN ('-1', '0') AND enrolled='${i}' UNION `;
+    }
+    sql += `SELECT 'Total' as Enrollment, COUNT(CASE WHEN c.school_title='SBE' THEN 'SBE' END) AS SBE, COUNT(CASE WHEN c.school_title='SELS' THEN 'SELS' END) AS SELS, COUNT(CASE WHEN c.school_title='SETS' THEN 'SBE' END) AS SETS, COUNT(CASE WHEN c.school_title='SLASS' THEN 'SLASS' END) AS SLASS, COUNT(CASE WHEN c.school_title='SPPH' THEN 'SPPH' END) AS SPPH, COUNT(cs.courseId) AS Total FROM course_section as cs, course as c WHERE semester = '${semester}' AND year = ${year} AND cs.courseId=c.courseId AND cs.blocked IN ('-1', '0') ;`;
+    let query = db.query(sql, (err, results) => {
+      if (err) throw err;
+      res.send(results);
+    });
+  });
+});
+
+
+
+
+
+
 // reveue 1st table
 app.get("/revenue-of-schools", (req, res) => {
-
   let sql = `SELECT CONCAT(CS.year, CASE WHEN CS.semester='Autumn' THEN "3" WHEN CS.semester='Spring' THEN "1" WHEN CS.semester='Summer' THEN "2" END, CS.semester) as Semester, 
   SUM(CASE WHEN C.school_title='SBE' THEN CS.enrolled*C.credit_hour END) as SBE, 
   SUM(CASE WHEN C.school_title='SETS' THEN CS.enrolled*C.credit_hour END) as SETS, 
@@ -132,22 +219,25 @@ app.get("/revenue-of-schools", (req, res) => {
   SUM(CS.enrolled*C.credit_hour) as Total, 
   ((SUM(CS.enrolled*C.credit_hour) - (SELECT SUM(course_section.enrolled*course.credit_hour) FROM course_section, course WHERE course_section.year=CS.year-1 AND course_section.semester=CS.semester AND course_section.courseId=course.courseId AND course_section.blocked IN ('-1', '0')))/SUM(CS.enrolled*C.credit_hour))*100 as DIFFERENCE 
   FROM course_section as CS, course as C WHERE CS.courseId=C.courseId AND CS.blocked IN ('-1', '0') GROUP BY year, semester ORDER BY semester;`;
-            
-    let query = db.query(sql, (err, results) => {
-      if (err) throw err;
-      console.log(results);
-      res.send(results);
-    });
+
+  let query = db.query(sql, (err, results) => {
+    if (err) throw err;
+    console.log(results);
+    res.send(results);
   });
+});
 
 
 
 
-  //Usage of the resources -- start
-  app.get("/usage-of-resources/:semester/:year", (req, res) => {
 
-    const {semester, year} = req.params;
-    let sql = `SELECT
+
+
+
+//Usage of the resources -- start
+app.get("/usage-of-resources/:semester/:year", (req, res) => {
+  const { semester, year } = req.params;
+  let sql = `SELECT
     CASE
           WHEN semester = 'Spring' THEN 'Spring'
           WHEN semester = 'Summer' THEN 'Summer'
@@ -182,18 +272,23 @@ app.get("/revenue-of-schools", (req, res) => {
       AND year = ${year} 
       AND course_section.roomId = classroom.roomId 
       AND course_section.courseId = course.courseId AND course_section.blocked!='B-0'
-      GROUP BY School;`       
-        let query = db.query(sql, (err, results) => {
-        if (err) throw err;
-        console.log(results);
-        res.send(results);
-      });
-    });
+      GROUP BY School;`;
+  let query = db.query(sql, (err, results) => {
+    if (err) throw err;
+    console.log(results);
+    res.send(results);
+  });
+});
 
 
-    app.get("/usage-of-resources-summary/:semester/:year", (req, res) => {
-      const {semester, year} = req.params;
-      let sql = `SELECT 'Average of ROOM_CAPACITY' as "", SUM(classroom.room_capacity)/COUNT(course_section.courseId) as Semester FROM course_section, course, classroom WHERE semester= '${semester}' AND year =${year} AND course_section.courseId=course.courseId AND course_section.roomId=classroom.roomId AND course_section.blocked!='B-0' 
+
+
+
+
+
+app.get("/usage-of-resources-summary/:semester/:year", (req, res) => {
+  const { semester, year } = req.params;
+  let sql = `SELECT 'Average of ROOM_CAPACITY' as "", SUM(classroom.room_capacity)/COUNT(course_section.courseId) as Semester FROM course_section, course, classroom WHERE semester= '${semester}' AND year =${year} AND course_section.courseId=course.courseId AND course_section.roomId=classroom.roomId AND course_section.blocked!='B-0' 
       UNION 
       SELECT 'Average of ENROLLED', SUM(enrolled)/COUNT(course_section.courseId) as 'Avg Enrolled' FROM course_section, course, classroom WHERE semester= '${semester}' AND year = ${year} AND course_section.courseId=course.courseId AND course_section.roomId=classroom.roomId AND course_section.blocked!='B-0'
       UNION 
@@ -201,17 +296,22 @@ app.get("/revenue-of-schools", (req, res) => {
       UNION
       SELECT 'Unused Percent', ((SUM(classroom.room_capacity)/COUNT(course_section.courseId) - SUM(enrolled)/COUNT(course_section.courseId))/(SUM(classroom.room_capacity)/COUNT(course_section.courseId)))*100 as 'Unsed%' FROM course_section, course, classroom
       WHERE semester= '${semester}' AND year = ${year} AND course_section.courseId=course.courseId AND course_section.roomId=classroom.roomId AND course_section.blocked!='B-0';`;
-      
-        let query = db.query(sql, (err, results) => {
-          if (err) throw err;
-          console.log(results);
-          res.send(results);
-        });
-      });
+
+  let query = db.query(sql, (err, results) => {
+    if (err) throw err;
+    console.log(results);
+    res.send(results);
+  });
+});
 
 
-      app.get("/available-resources", (req, res) => {
-        let sql = `SELECT room_capacity AS 'Class Size',
+
+
+
+
+
+app.get("/available-resources", (req, res) => {
+  let sql = `SELECT room_capacity AS 'Class Size',
         COUNT(roomId) AS 'IUB Resource', 
         (room_capacity*COUNT(roomId)) AS 'Capacity'  
         FROM classroom
@@ -221,17 +321,23 @@ app.get("/revenue-of-schools", (req, res) => {
         COUNT(roomId) AS 'IUB Resource',
         SUM(room_capacity) AS 'Capacity'
         FROM classroom;`;
-        
-          let query = db.query(sql, (err, results) => {
-            if (err) throw err;
-            console.log(results);
-            res.send(results);
-          });
-        });
+
+  let query = db.query(sql, (err, results) => {
+    if (err) throw err;
+    console.log(results);
+    res.send(results);
+  });
+});
 
 
-      app.get("/available-resources-summary", (req, res) => {
-          let sql = `SELECT 'Total Capacity with 6 slot 2 days',
+
+
+
+
+
+
+app.get("/available-resources-summary", (req, res) => {
+  let sql = `SELECT 'Total Capacity with 6 slot 2 days',
           '',
           SUM(room_capacity) * 12 AS 'Capacity'
           FROM classroom
@@ -250,18 +356,23 @@ app.get("/revenue-of-schools", (req, res) => {
           '',
           ROUND(SUM(room_capacity) * 14 / 3.5, 0) 'Capacity'
           FROM classroom;`;
-          
-            let query = db.query(sql, (err, results) => {
-              if (err) throw err;
-              console.log(results);
-              res.send(results);
-            });
-          });
+
+  let query = db.query(sql, (err, results) => {
+    if (err) throw err;
+    console.log(results);
+    res.send(results);
+  });
+});
+
+
+
+
+
 
 
 app.get("/:semester/:year", (req, res) => {
-    const {semester, year} = req.params;
-    let sql = `SELECT 
+  const { semester, year } = req.params;
+  let sql = `SELECT 
     CASE 
         WHEN room_capacity BETWEEN 1 AND 20 THEN '20'
           WHEN room_capacity BETWEEN 21 AND 30 THEN '30'
@@ -290,21 +401,24 @@ app.get("/:semester/:year", (req, res) => {
       ROUND(COUNT(DISTINCT(course_section.roomId)) - COUNT(CASE WHEN enrolled > 0 THEN 1 END) / 12, 1) AS Difference
   FROM course_section
   LEFT JOIN classroom ON course_section.roomId = classroom.roomId
-  WHERE (semester = '${semester}' AND year = ${year} OR enrolled = 0) AND room_capacity != 0;`
+  WHERE (semester = '${semester}' AND year = ${year} OR enrolled = 0) AND room_capacity != 0;`;
 
-    let query = db.query(sql, (err, results) => {
-      if (err) throw err;
-      console.log(results);
-      res.send(results);
-    });
+  let query = db.query(sql, (err, results) => {
+    if (err) throw err;
+    console.log(results);
+    res.send(results);
   });
+});
 
 
 
 
-  app.get("/resources-utilization/:semester/:year", (req, res) => {
-    const {semester, year} = req.params;
-    let sql = `SELECT 
+
+
+
+app.get("/resources-utilization/:semester/:year", (req, res) => {
+  const { semester, year } = req.params;
+  let sql = `SELECT 
     CASE 
         WHEN room_capacity BETWEEN 1 AND 20 THEN '20'
           WHEN room_capacity BETWEEN 21 AND 30 THEN '30'
@@ -333,53 +447,38 @@ app.get("/:semester/:year", (req, res) => {
       COUNT(DISTINCT(course_section.roomId)) - ROUND(COUNT(CASE WHEN enrolled > 0 THEN 1 END) / 12, 1) AS Difference
   FROM course_section
   LEFT JOIN classroom ON course_section.roomId = classroom.roomId
-  WHERE (semester = '${semester}' AND year = ${year} OR enrolled = 0) AND room_capacity != 0;`
+  WHERE (semester = '${semester}' AND year = ${year} OR enrolled = 0) AND room_capacity != 0;`;
 
-    let query = db.query(sql, (err, results) => {
-      if (err) throw err;
-      console.log(results);
-      res.send(results);
-    });
+  let query = db.query(sql, (err, results) => {
+    if (err) throw err;
+    console.log(results);
+    res.send(results);
   });
+});
 
 
 
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-          
-  app.get("/semesters&Years-on-database", (req, res) => {
-
+app.get("/semesters&Years-on-database", (req, res) => {
   let sql = `SELECT DISTINCT semester, year
   FROM course_section;`;
-  
-    let query = db.query(sql, (err, results) => {
-      if (err) throw err;
-      console.log(results);
-      res.send(results);
-    });
+
+  let query = db.query(sql, (err, results) => {
+    if (err) throw err;
+    console.log(results);
+    res.send(results);
   });
-
- 
-
+});
 
 
 
 
-  app.get("/revenue-of-sets", (req, res) => {
 
-    let sql = `SELECT CONCAT(CS.year, CASE WHEN CS.semester='Autumn' THEN "3" WHEN CS.semester='Spring' THEN "1" WHEN CS.semester='Summer' THEN "2" END, CS.semester) as Semester, 
+
+
+app.get("/revenue-of-sets", (req, res) => {
+  let sql = `SELECT CONCAT(CS.year, CASE WHEN CS.semester='Autumn' THEN "3" WHEN CS.semester='Spring' THEN "1" WHEN CS.semester='Summer' THEN "2" END, CS.semester) as Semester, 
 
     SUM(CASE WHEN C.school_title='SETS' AND C.courseId LIKE 'CCR%' OR C.courseId LIKE 'CNC%' OR C.courseId LIKE 'CEN%' OR  C.courseId LIKE 'SEN%' OR C.courseId LIKE 'CIS%' OR C.courseId LIKE 'CSC%' OR C.courseId LIKE 'CSE%' THEN CS.enrolled*C.credit_hour END) as CSE,
     
@@ -396,13 +495,17 @@ app.get("/:semester/:year", (req, res) => {
     ((SUM(CASE WHEN C.school_title='SETS' AND C.courseId LIKE 'PHY%' OR C.courseId LIKE 'MAT%' THEN CS.enrolled*C.credit_hour END) - (SELECT SUM(course_section.enrolled*course.credit_hour) FROM course_section, course WHERE course_section.year=CS.year-1 AND course_section.semester=CS.semester AND course.school_title='SETS' AND course_section.courseId=course.courseId  AND course_section.blocked IN ('-1', '0') AND (course.courseId LIKE 'PHY%' OR course.courseId LIKE 'MAT%')))/SUM(CASE WHEN C.school_title='SETS' AND C.courseId LIKE 'PHY%' OR C.courseId LIKE 'MAT%' THEN CS.enrolled*C.credit_hour END))*100 as 'PS%',
     
     (SUM(CASE WHEN C.school_title='SETS' THEN CS.enrolled*C.credit_hour END) - (SELECT SUM(course_section.enrolled*course.credit_hour) FROM course_section, course WHERE course_section.year=CS.year-1 AND course_section.semester=CS.semester AND course.school_title='SETS' AND course_section.courseId=course.courseId  AND course_section.blocked IN ('-1', '0')))/(SUM(CASE WHEN C.school_title='SETS' THEN CS.enrolled*C.credit_hour END))*100 as 'SETS%' FROM course_section as CS, course as C WHERE CS.courseId=C.courseId AND CS.blocked IN ('-1', '0') GROUP BY year, semester ORDER BY semester;`;
-    
-      let query = db.query(sql, (err, results) => {
-        if (err) throw err;
-        console.log(results);
-        res.send(results);
-      });
-    });
+
+  let query = db.query(sql, (err, results) => {
+    if (err) throw err;
+    console.log(results);
+    res.send(results);
+  });
+});
+
+
+
+
 
 
 app.get("/api", (req, res) => {
@@ -412,7 +515,3 @@ app.get("/api", (req, res) => {
 app.listen(PORT, () => {
   console.log(`Server listening on ${PORT}`);
 });
-
-
-
-

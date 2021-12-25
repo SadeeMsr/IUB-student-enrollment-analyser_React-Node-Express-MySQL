@@ -1,0 +1,16 @@
+.upload_data_pageContainer{
+    width: 78%;
+    min-height: 100vh;
+    position: relative;
+}
+
+
+.fileChooser_container{
+    min-height:25%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 20px; 
+}
+
+

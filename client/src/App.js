@@ -13,6 +13,7 @@ import RevenueOfSchools from './pages/revenue-of-engineering/RevenueOfSchools';
 import RevenueOfSets from './pages/revenue-of-school/RevenueOfSets';
 import EnrollmentBreakdown from './pages/enrolment-breakdown/EnrollmentBreakdown';
 import AvailableResourceSummeries from './pages/available-resource-summery/AvailableResourceSummeries';
+import UploadDataPage from './pages/upload/UploadDataPage';
 
 function App() {
   return (
@@ -20,6 +21,7 @@ function App() {
       <Sidebar/>
       <Router>
         <Routes>
+        <Route path='/' element={<UploadDataPage/>} />
         <Route path='/classroom-requirements' element={<ClassroomRequirement/>} />
         <Route path='/class-size-distributions' element={<ClassDistribution/>} />
         <Route path='/resource-summaries' element={<ResourceSummeries/>} />
