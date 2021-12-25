@@ -1,0 +1,96 @@
+.eschool_revenue_pageContainer{
+    width: 78%;
+    min-height: 100vh;
+    position: relative;
+}
+
+.erschool_revenue_tblChart_container{
+    margin-top: 100px;
+    display: grid;
+    padding-bottom: 200px;
+    grid-template-areas:
+    'DataTable DataTable DataTable DataTable DataTable DataTable'
+    'lineChart lineChart lineChart lineChart lineChart lineChart'
+    'areaChart areaChart areaChart areaChart areaChart areaChart'
+    'barLineChart barLineChart barLineChart barLineChart barLineChart barLineChart'
+    'barLineChart2 barLineChart2 barLineChart2 barLineChart2 barLineChart2 barLineChart2';
+}
+
+.esr_table_container{
+    grid-area: DataTable;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    flex-direction: column;
+    gap: 40px;
+}
+
+.esr_table_container>h4{
+    color:#0854DA;
+    font-size: 18px;
+}
+
+.erslineChart_container1{
+    margin-top: 100px;
+    width: 100%;
+    grid-area: lineChart;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-direction: column;
+    gap: 20px;
+}
+
+.erslineChart_container1>h4{
+    color:#0854DA;
+    font-size: 18px;
+}
+
+.ersAreaChart_container1{
+    margin-top: 100px;
+    width: 100%;
+    grid-area: areaChart;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-direction: column;
+    gap: 20px;
+}
+
+.ersAreaChart_container1>h4{
+    color:#0854DA;
+    font-size: 18px;
+}
+
+.ersbarLineChart_container{
+    margin-top: 100px;
+    width: 100%;
+    grid-area: barLineChart;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-direction: column;
+    gap: 20px;
+}
+
+.ersbarLineChart_container>h4{
+    color:#0854DA;
+    font-size: 18px;
+}
+
+
+.ersbarLineChart_container2{
+    margin-top: 100px;
+    width: 100%;
+    grid-area: barLineChart2;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-direction: column;
+    gap: 20px;
+}
+
+.ersbarLineChart_container2>h4{
+    color:#0854DA;
+    font-size: 18px;
+}
