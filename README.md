@@ -43,8 +43,8 @@ Here is the more detailed report on the system 👇🏻
 - React Js 
 - Neomorphic UI design pattern with CSS3 and bootstrap 5.
 - Rechart implementation
-- Extracting large sets of valid data from Excel 
 - Working with Relational Database(MySQL) in Node JS
+- Extracting large sets of valid data from Excel and store it on RDBMS in backend
 - Team work with github
 # Notice 🔴
 Just to let you know server code is bit unorganized here. To assess my proper organized backend code skill you can, 
