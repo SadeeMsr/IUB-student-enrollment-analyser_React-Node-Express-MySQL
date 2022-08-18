@@ -9,15 +9,7 @@ Tasks were to make a system that:
 
 -  Analyzes Enrollment Data
 -  Manages data on a relational database
--  Generate specific reports on given functional requirements
-
-# IUB Student Enrollment Analyzer
-This app was a project given from my university (IUB) course called DBMS(Database Management System) which is based on large sets of real Enrollment Data from [IRAS](https://iras.iub.edu.bd/login/Default.aspx).
-Tasks were to make a system that:
-
--  Analyzes Enrollment Data
--  Manages data on a relational database
--  Generate specific reports on given functional requirements
+-  Generates specific reports on given functional requirements
 
 ## Functional Requirements
 The following eight analyses can be requested and viewed by the users using the system:
